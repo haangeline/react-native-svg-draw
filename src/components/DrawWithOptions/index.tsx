@@ -17,7 +17,7 @@ import SquareSvg from './SquareSvg';
 import ArrowSvg from './ArrowSvg';
 import TextSvg from './TextSvg';
 import CloseSvg from './CloseSvg';
-import ThrashSvg from './ThrashSvg';
+import TrashSvg from './TrashSvg';
 import SendSvg from './SendSvg';
 
 const styles = StyleSheet.create({
@@ -210,7 +210,7 @@ export default function DrawWithOptions({
                 drawRef.current?.deleteSelectedItem();
               }}
             >
-              <ThrashSvg width={28} height={28} fill="white" />
+              <TrashSvg width={28} height={28} fill="white" />
             </Pressable>
           ) : null}
           <Pressable style={styles.sendButton} onPress={onPressSend}>

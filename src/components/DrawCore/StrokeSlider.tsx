@@ -46,10 +46,12 @@ const StrokeSlider = ({
   minValue,
   maxValue,
   stroke,
+  onChange,
 }: {
   minValue: number;
   maxValue: number;
   stroke: Animated.SharedValue<number>;
+  onChange: () => void;
 }) => {
   const sliderHeight = useSharedValue(0);
 
@@ -81,7 +83,9 @@ const StrokeSlider = ({
           )
         );
       },
-      onEnd: () => {},
+      onEnd: () => {
+        runOnJS(onChange)();
+      },
     },
     []
   );

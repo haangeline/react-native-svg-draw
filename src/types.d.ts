@@ -5,7 +5,6 @@ import {
   EllipseProps,
   LineProps,
   RectProps,
-  PathProps,
 } from 'react-native-svg';
 
 export type Point = { x: number; y: number };
@@ -23,6 +22,24 @@ export type DrawItem = (
   | { type: 'ellipse'; data: EllipseProps }
   | { type: 'text'; data: ForeignObjectProps; text?: string }
   | { type: 'pen'; data: Point[] }
+) & { strokeWidth: number; color: hslColor };
+
+export type OrderedDrawItem = (
+  | { type: 'singleHead'; data: LineProps }
+  | { type: 'doubleHead'; data: LineProps }
+  | { type: 'rectangle'; data: RectProps }
+  | { type: 'ellipse'; data: EllipseProps }
+  | { type: 'text'; data: ForeignObjectProps; text?: string }
+  | { type: 'pen'; data: Point[] }
+) & { strokeWidth: number; color: hslColor; indice: number };
+
+export type LayeredItem = (
+  | { title: 'Arrow'; miniature: LineProps }
+  | { title: 'Double arrow'; miniature: LineProps }
+  | { title: 'Rectangle'; miniature: RectProps }
+  | { title: 'Ellipse'; miniature: EllipseProps }
+  | { title: string }
+  | { title: 'Hand draw'; miniature: Point[] }
 ) & { strokeWidth: number; color: hslColor };
 
 export type DrawItemType = DrawItem['type'];

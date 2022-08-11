@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useImperativeHandle,
   useRef,
+  useReducer,
   useState,
 } from 'react';
 import {
@@ -38,8 +39,10 @@ import type {
   DrawCoreProps,
   hslColor,
   Size,
+  OrderedDrawItem,
 } from '../../types';
 import DrawPad from './DrawPad';
+import LayeredItemsBottomSheet from './LayeredItemsBottomSheet';
 import ViewShot from 'react-native-view-shot';
 
 const RIGHT_PANE_WIDTH = 60;
@@ -85,10 +88,10 @@ const styles = StyleSheet.create({
   },
 });
 
-function pDistance(
+const pDistance = (
   point: { x: number; y: number },
   line: { x1: number; x2: number; y1: number; y2: number }
-) {
+) => {
   'worklet';
   const { x1, x2, y1, y2 } = line;
   const { x, y } = point;
@@ -122,7 +125,7 @@ function pDistance(
   var dx = x - xx;
   var dy = y - yy;
   return Math.sqrt(dx * dx + dy * dy);
-}
+};
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
@@ -150,7 +153,7 @@ type Context = {
 const drawNewItem = (
   mode: Animated.SharedValue<DrawItemType>,
   currentItem: Animated.SharedValue<DrawItem | null>,
-  updateDoneItems: (item: DrawItem) => void,
+  addDoneItems: (item: DrawItem) => void,
   position: { x: number; y: number },
   style: {
     textBaseHeight: Animated.SharedValue<number | null>;
@@ -161,7 +164,7 @@ const drawNewItem = (
   'worklet';
 
   if (currentItem.value) {
-    runOnJS(updateDoneItems)(currentItem.value);
+    runOnJS(addDoneItems)(currentItem.value);
   }
 
   switch (mode.value) {
@@ -225,6 +228,109 @@ const drawNewItem = (
   }
 };
 
+type Action =
+  | { type: 'ADD DONE ITEM'; item: DrawItem }
+  | { type: 'ADD LAYERED ITEM'; item: DrawItem }
+  | { type: 'CHANGE CURRENT ITEM'; item: DrawItem }
+  | { type: 'MOVE DONE TO CURRENT'; indice: number }
+  | { type: 'DELETE ITEM'; indice: number };
+
+const reducerDrawStates = (
+  drawStates: {
+    doneItems: DrawItem[];
+    layeredItems: OrderedDrawItem[];
+  },
+  action: Action
+) => {
+  'worklet';
+  switch (action.type) {
+    case 'ADD DONE ITEM':
+      // currentItem --> doneItems
+      return {
+        doneItems: drawStates.doneItems.concat(action.item),
+        layeredItems: drawStates.layeredItems.map((item) => {
+          if (item.indice === -1) {
+            return { ...item, indice: drawStates.doneItems.length };
+          }
+          return item;
+        }),
+      };
+    case 'ADD LAYERED ITEM':
+      //  new item drawn
+      return {
+        ...drawStates,
+        layeredItems: drawStates.layeredItems.concat({
+          ...action.item,
+          indice: -1,
+        }),
+      };
+    case 'CHANGE CURRENT ITEM':
+      return {
+        ...drawStates,
+        layeredItems: drawStates.layeredItems.map((item): OrderedDrawItem => {
+          if (item.indice === -1) {
+            return { ...action.item, indice: -1 };
+          }
+          return item;
+        }),
+      };
+    case 'MOVE DONE TO CURRENT':
+      // item selected : moved from done to current
+      // adjust indice of layered items in consequence
+
+      const newDoneItems = drawStates.doneItems;
+      newDoneItems.splice(action.indice, 1);
+
+      return {
+        doneItems: newDoneItems,
+        layeredItems: drawStates.layeredItems.map((item): OrderedDrawItem => {
+          const indice = item.indice;
+          if (indice === action.indice) {
+            return {
+              ...item,
+              indice: -1,
+            };
+          }
+          if (indice > action.indice) {
+            return {
+              ...item,
+              indice: indice - 1,
+            };
+          }
+          return item;
+        }),
+      };
+    case 'DELETE ITEM':
+      if (action.indice === -1) {
+        return {
+          ...drawStates,
+          layeredItems: drawStates.layeredItems.filter(
+            (item) => item.indice !== action.indice
+          ),
+        };
+      } else {
+        const newDoneItemsII = drawStates.doneItems;
+        newDoneItemsII.splice(action.indice, 1);
+
+        return {
+          doneItems: newDoneItemsII,
+          layeredItems: drawStates.layeredItems
+            .filter((item) => item.indice !== action.indice)
+            .map((item): OrderedDrawItem => {
+              const indice = item.indice;
+              if (indice > action.indice) {
+                return {
+                  ...item,
+                  indice: indice - 1,
+                };
+              }
+              return item;
+            }),
+        };
+      }
+  }
+};
+
 const onTextHeightUpdate = (
   currentItem: Animated.SharedValue<DrawItem | null>,
   textBaseHeight: Animated.SharedValue<number | null>,
@@ -274,45 +380,71 @@ const DrawCore = React.forwardRef<
 
   const initialItem = useSharedValue<DrawItem | null>(null);
 
-  const [doneItems, setDoneItems] = useState<DrawItem[]>([]);
+  const [drawStates, dispatchDrawStates] = useReducer(reducerDrawStates, {
+    doneItems: [],
+    layeredItems: [],
+  });
 
   const textBaseHeight = useSharedValue<number | null>(null);
 
-  const updateDoneItems = useCallback((done: DrawItem) => {
-    setDoneItems((previous) => previous.concat(done));
+  const addDoneItem = useCallback((item: DrawItem) => {
+    dispatchDrawStates({ type: 'ADD DONE ITEM', item: item });
   }, []);
+
+  const addLayeredItems = useCallback((item: DrawItem) => {
+    dispatchDrawStates({ type: 'ADD LAYERED ITEM', item: item });
+  }, []);
+
+  const changeCurrentItem = useCallback(() => {
+    if (currentItem.value) {
+      dispatchDrawStates({
+        type: 'CHANGE CURRENT ITEM',
+        item: currentItem.value,
+      });
+    }
+  }, [currentItem.value]);
+
+  const selectItem = useCallback((indice: number) => {
+    dispatchDrawStates({ type: 'MOVE DONE TO CURRENT', indice: indice });
+  }, []);
+
+  const deleteItem = useCallback(
+    (indice: number) => () => {
+      dispatchDrawStates({ type: 'DELETE ITEM', indice: indice });
+      if (currentItem.value && indice === -1) {
+        currentItem.value = null;
+      }
+    },
+    [currentItem]
+  );
 
   useImperativeHandle(
     ref,
     () => ({
       drawingContainer: drawContainer,
       deleteSelectedItem: () => {
-        if (currentItem.value) {
-          currentItem.value = null;
-        }
+        deleteItem(-1)();
         onSelectionChange?.(false);
       },
       takeSnapshot: async (): Promise<string | undefined> => {
         if (currentItem.value) {
-          updateDoneItems(currentItem.value);
+          addDoneItem(currentItem.value);
           currentItem.value = null;
         }
         return viewShot.current?.capture?.();
       },
     }),
-    [currentItem, onSelectionChange, updateDoneItems]
+    [addDoneItem, currentItem, deleteItem, onSelectionChange]
   );
 
   useEffect(() => {
     mode.value = drawingMode;
     if (currentItem.value) {
-      updateDoneItems(currentItem.value);
+      addDoneItem(currentItem.value);
     }
     currentItem.value = null;
     onSelectionChange?.(false);
-  }, [drawingMode, mode, currentItem, updateDoneItems, onSelectionChange]);
-
-  const addNewItem = runOnJS(updateDoneItems);
+  }, [drawingMode, mode, currentItem, onSelectionChange, addDoneItem]);
 
   const strokeWidth = useSharedValue<number>(2);
 
@@ -343,9 +475,7 @@ const DrawCore = React.forwardRef<
     Context
   >(
     {
-      onStart: ({ x, y }, ctx) => {
-        const startX = x;
-        const startY = y;
+      onStart: ({ x: startX, y: startY }, ctx) => {
         ctx.startX = startX;
         ctx.startY = startY;
         ctx.newlyCreated = false;
@@ -587,7 +717,10 @@ const DrawCore = React.forwardRef<
             break;
         }
       },
-      onActive: ({ x, y, translationX, translationY }, ctx) => {
+      onActive: (
+        { x: currentX, y: currentY, translationX, translationY },
+        ctx
+      ) => {
         const { startX, startY, zone, newlyCreated } = ctx;
         if (zone === 'OUT' && newlyCreated === false) {
           ctx.newlyCreated = true;
@@ -597,7 +730,7 @@ const DrawCore = React.forwardRef<
           drawNewItem(
             mode,
             currentItem,
-            addNewItem,
+            addDoneItem,
             { x: startX, y: startY },
             { textBaseHeight, strokeWidth, color }
           );
@@ -624,8 +757,8 @@ const DrawCore = React.forwardRef<
                 strokeWidth: currentItem.value.strokeWidth,
                 color: currentItem.value.color,
                 data: currentItem.value.data.concat({
-                  x: x,
-                  y: y,
+                  x: currentX,
+                  y: currentY,
                 }),
               };
             }
@@ -1011,6 +1144,15 @@ const DrawCore = React.forwardRef<
                 : '',
           };
         }
+
+        if (!initialItem.value && currentItem.value) {
+          // a new item has been created --> add it to layeredItems
+          runOnJS(addLayeredItems)(currentItem.value);
+        }
+        if (initialItem.value && currentItem.value) {
+          //  selected item has been change
+          runOnJS(changeCurrentItem)();
+        }
       },
     },
     []
@@ -1063,38 +1205,44 @@ const DrawCore = React.forwardRef<
     () => {
       return { strokeWidth: strokeWidth.value, color: color.value };
     },
-    ({ strokeWidth, color }: { strokeWidth: number; color: hslColor }) => {
+    ({
+      strokeWidth: sw,
+      color: c,
+    }: {
+      strokeWidth: number;
+      color: hslColor;
+    }) => {
       switch (currentItem.value?.type) {
         case 'singleHead':
           currentItem.value = {
             type: currentItem.value.type,
             data: currentItem.value.data,
-            strokeWidth,
-            color,
+            strokeWidth: sw,
+            color: c,
           };
           break;
         case 'doubleHead':
           currentItem.value = {
             type: currentItem.value.type,
             data: currentItem.value.data,
-            strokeWidth,
-            color,
+            strokeWidth: sw,
+            color: c,
           };
           break;
         case 'ellipse':
           currentItem.value = {
             type: currentItem.value.type,
             data: currentItem.value.data,
-            strokeWidth,
-            color,
+            strokeWidth: sw,
+            color: c,
           };
           break;
         case 'rectangle':
           currentItem.value = {
             type: currentItem.value.type,
             data: currentItem.value.data,
-            strokeWidth,
-            color,
+            strokeWidth: sw,
+            color: c,
           };
           break;
 
@@ -1102,16 +1250,16 @@ const DrawCore = React.forwardRef<
           currentItem.value = {
             type: currentItem.value.type,
             data: currentItem.value.data,
-            strokeWidth,
-            color,
+            strokeWidth: sw,
+            color: c,
           };
           break;
         case 'text':
           currentItem.value = {
             type: currentItem.value.type,
             data: currentItem.value.data,
-            strokeWidth,
-            color,
+            strokeWidth: sw,
+            color: c,
             text: currentItem.value.text,
           };
           break;
@@ -1130,15 +1278,11 @@ const DrawCore = React.forwardRef<
       color.value = item.color;
       currentItem.value = item;
 
-      setDoneItems((done) => {
-        const copy = [...done];
-        copy.splice(index, 1);
-        return copy;
-      });
-
       if (previousItem) {
-        updateDoneItems(previousItem);
+        addDoneItem(previousItem);
       }
+
+      selectItem(index);
 
       if (item.type === 'text') {
         setTextVal(item.text ?? '');
@@ -1146,7 +1290,14 @@ const DrawCore = React.forwardRef<
         textInputRef.current?.blur();
       }
     },
-    [color, currentItem, strokeWidth, updateDoneItems, onSelectionChange]
+    [
+      onSelectionChange,
+      currentItem,
+      strokeWidth,
+      color,
+      selectItem,
+      addDoneItem,
+    ]
   );
 
   const onTextHeightChange = useCallback(
@@ -1209,11 +1360,7 @@ const DrawCore = React.forwardRef<
           });
         }}
       >
-        <PanGestureHandler
-          // activeOffsetX={2}
-          // activeOffsetY={2}
-          onGestureEvent={onGestureEvent}
-        >
+        <PanGestureHandler onGestureEvent={onGestureEvent}>
           <Animated.View style={imageSize || drawRegion}>
             <View ref={drawContainer}>
               {image ? (
@@ -1229,7 +1376,7 @@ const DrawCore = React.forwardRef<
                     <ImageBackground source={image} style={styles.bgImage}>
                       <DrawPad
                         currentItem={currentItem}
-                        doneItems={doneItems}
+                        doneItems={drawStates.doneItems}
                         onPressItem={onPressItem}
                         onTextHeightChange={onTextHeightChange}
                       />
@@ -1248,7 +1395,7 @@ const DrawCore = React.forwardRef<
                 >
                   <DrawPad
                     currentItem={currentItem}
-                    doneItems={doneItems}
+                    doneItems={drawStates.doneItems}
                     onPressItem={onPressItem}
                     onTextHeightChange={onTextHeightChange}
                   />
@@ -1260,10 +1407,19 @@ const DrawCore = React.forwardRef<
 
         <Animated.View style={[styles.rightPaneBaseStyle, rightPaneStyle]}>
           <View style={styles.strokeSliderContainer}>
-            <StrokeSlider minValue={2} maxValue={10} stroke={strokeWidth} />
+            <StrokeSlider
+              minValue={2}
+              maxValue={10}
+              stroke={strokeWidth}
+              onChange={changeCurrentItem}
+            />
           </View>
           <View style={styles.colorSliderContainer}>
-            <ColorSlider color={color} linearGradient={linearGradient} />
+            <ColorSlider
+              color={color}
+              linearGradient={linearGradient}
+              onChange={changeCurrentItem}
+            />
           </View>
         </Animated.View>
       </View>
@@ -1290,6 +1446,11 @@ const DrawCore = React.forwardRef<
           />
         </Animated.View>
       )}
+      <LayeredItemsBottomSheet
+        layeredItems={drawStates.layeredItems}
+        onPressItem={onPressItem}
+        deleteItem={deleteItem}
+      />
     </View>
   );
 });

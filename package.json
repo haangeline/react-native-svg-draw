@@ -158,5 +158,8 @@
         }
       ]
     ]
+  },
+  "dependencies": {
+    "@gorhom/bottom-sheet": "^4.4.3"
   }
 }
