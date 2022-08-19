@@ -8248,7 +8248,12 @@
     "jscodeshift" "^0.13.1"
     "nullthrows" "^1.1.1"
 
-"react-native-gesture-handler@*", "react-native-gesture-handler@^2.5.0", "react-native-gesture-handler@>=1.10.1":
+"react-native-draggable-flatlist@^3.1.2":
+  "integrity" "sha512-cqBR+lZktTqHY/J7V0aq+TZNkuqeILxwZ5bBXKndokwH4qvZl7ifijM7LlfWhfhU1/pzjketTsX7P2zyojfAaQ=="
+  "resolved" "https://registry.npmjs.org/react-native-draggable-flatlist/-/react-native-draggable-flatlist-3.1.2.tgz"
+  "version" "3.1.2"
+
+"react-native-gesture-handler@*", "react-native-gesture-handler@^2.5.0", "react-native-gesture-handler@>=1.10.0", "react-native-gesture-handler@>=1.10.1":
   "integrity" "sha512-djZdcprFf08PZC332D+AeG5wcGeAPhzfCJtB3otUgOgTlvjVXmg/SLFdPJSpzLBqkRAmrC77tM79QgKbuLxkfw=="
   "resolved" "https://registry.npmjs.org/react-native-gesture-handler/-/react-native-gesture-handler-2.5.0.tgz"
   "version" "2.5.0"
@@ -8300,7 +8305,7 @@
   "resolved" "https://registry.npmjs.org/react-native-view-shot/-/react-native-view-shot-3.3.0.tgz"
   "version" "3.3.0"
 
-"react-native@*", "react-native@^0.68.2", "react-native@>=0.50.0":
+"react-native@*", "react-native@^0.68.2", "react-native@>=0.50.0", "react-native@>=0.64.0":
   "integrity" "sha512-qNMz+mdIirCEmlrhapAtAG+SWVx6MAiSfCbFNhfHqiqu1xw1OKXdzIrjaBEPihRC2pcORCoCHduHGQe/Pz9Yuw=="
   "resolved" "https://registry.npmjs.org/react-native/-/react-native-0.68.2.tgz"
   "version" "0.68.2"

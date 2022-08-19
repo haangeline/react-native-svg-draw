@@ -27,21 +27,18 @@ export default function LayeredItemJSX({
   item,
   onPress,
   deleteItem,
+  drag,
 }: {
   item: LayeredItem;
   onPress: () => void;
   deleteItem: () => void;
+  drag: () => void;
 }) {
   return (
     <G onPressIn={onPress}>
       <View style={styles.container}>
         <Text style={styles.text}>{item.title}</Text>
-        <Pressable
-          style={styles.reorder}
-          onPress={() => {
-            console.log('onpress');
-          }}
-        >
+        <Pressable style={styles.reorder} onPressIn={drag}>
           <ReorderSvg width={15} height={8} stroke="white" />
         </Pressable>
         <Pressable

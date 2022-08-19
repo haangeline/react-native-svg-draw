@@ -31,20 +31,16 @@ const styles = StyleSheet.create({
 export default function CurrentLayeredItemJSX({
   item,
   deleteItem,
+  drag,
 }: {
   item: LayeredItem;
   deleteItem: () => void;
+  drag: () => void;
 }) {
   return (
     <View style={styles.container}>
       <Text style={styles.text}> {item.title} </Text>
-      <Pressable
-        style={styles.reorder}
-        onPress={(event) => {
-          event.stopPropagation();
-          console.log(event);
-        }}
-      >
+      <Pressable style={styles.reorder} onPressIn={drag}>
         <ReorderSvg width={15} height={8} stroke="#C9C9C9" />
       </Pressable>
       <Pressable

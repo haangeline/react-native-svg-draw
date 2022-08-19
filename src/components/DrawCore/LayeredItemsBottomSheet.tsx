@@ -1,15 +1,17 @@
 import React, { useMemo, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import type { DrawItem, LayeredItem, OrderedDrawItem } from 'src/types';
+import BottomSheet from '@gorhom/bottom-sheet';
+import DraggableFlatList, {
+  RenderItemParams,
+} from 'react-native-draggable-flatlist';
 import LayeredItemJSX from './LayeredItem';
 import CurrentLayeredItemJSX from './CurrentLayeredItem';
 import type { RectProps } from 'react-native-svg';
+import type { DrawItem, LayeredItem, OrderedDrawItem } from 'src/types';
 
 const styles = StyleSheet.create({
   bottomSheet: {
     flex: 1,
-    // color: '#2E313B',
   },
   contentContainer: {
     flex: 1,
@@ -22,7 +24,17 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 17,
   },
+  rowItem: {
+    height: 50,
+    // width: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 10,
+    backgroundColor: '#C9C9C9',
+  },
 });
+
+type listedItem = { item: OrderedDrawItem; key: string };
 
 const miniWidth = 51;
 const miniHeight = 41;
@@ -106,6 +118,34 @@ const LayeredItemsBottomSheet = ({
 
   const snapPoints = useMemo(() => [50, '50%', '100%'], []);
 
+  let list = layeredItems.map((item, index) => ({
+    item,
+    key: String(index),
+  }));
+
+  const renderItem = ({ item, drag }: RenderItemParams<listedItem>) => {
+    if (item.item.indice === -1) {
+      return (
+        <CurrentLayeredItemJSX
+          key={item.key}
+          item={orderedToLayered(item.item)}
+          deleteItem={deleteItem(item.item.indice)}
+          drag={drag}
+        />
+      );
+    } else {
+      return (
+        <LayeredItemJSX
+          key={item.key}
+          item={orderedToLayered(item.item)}
+          onPress={onPressItem(item.item, item.item.indice)}
+          deleteItem={deleteItem(item.item.indice)}
+          drag={drag}
+        />
+      );
+    }
+  };
+
   return (
     <>
       <BottomSheet
@@ -113,35 +153,20 @@ const LayeredItemsBottomSheet = ({
         ref={bottomSheetRef}
         index={1}
         snapPoints={snapPoints}
-        // onChange={handleSheetChanges}
       >
         <View style={styles.contentContainer}>
           <Text style={styles.title}>Calques</Text>
           <Text style={styles.subtitle}>
             Sélectionnez et organisez vos items
           </Text>
-          <BottomSheetScrollView>
-            {layeredItems.map((item) => {
-              if (item.indice === -1) {
-                return (
-                  <CurrentLayeredItemJSX
-                    key={item.indice}
-                    item={orderedToLayered(item)}
-                    deleteItem={deleteItem(item.indice)}
-                  />
-                );
-              } else {
-                return (
-                  <LayeredItemJSX
-                    key={item.indice}
-                    item={orderedToLayered(item)}
-                    onPress={onPressItem(item, item.indice)}
-                    deleteItem={deleteItem(item.indice)}
-                  />
-                );
-              }
-            })}
-          </BottomSheetScrollView>
+          <DraggableFlatList
+            data={list}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.key}
+            onDragEnd={({ data }) => {
+              list = { ...data };
+            }}
+          />
         </View>
       </BottomSheet>
     </>

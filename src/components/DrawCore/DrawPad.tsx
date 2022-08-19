@@ -78,11 +78,9 @@ const DrawPad = ({
           </Marker>
         </Defs>
 
-        {doneItems.map((item, index) => {
-          return (
-            <Item key={index} item={item} onPress={onPressItem(item, index)} />
-          );
-        })}
+        {doneItems.map((item, index) => (
+          <Item key={index} item={item} onPress={onPressItem(item, index)} />
+        ))}
 
         <CurrentAnimatedItem currentItem={currentItem} />
       </Svg>
